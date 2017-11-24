@@ -19,7 +19,7 @@
             <version>1.7.21</version>
         </dependency>
         <dependency>
-            <groupId>ca.jeffyecn</groupId>
+            <groupId>com.langcode</groupId>
             <artifactId>gce-toolbox-library</artifactId>
             <version>1.0.0</version>
         </dependency>
