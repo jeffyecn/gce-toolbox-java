@@ -3,8 +3,6 @@ package com.langcode.gcetoolbox;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.concurrent.TimeUnit;
-
 public class TestApp {
     private final static Logger LOG;
 
@@ -17,6 +15,25 @@ public class TestApp {
 
         EnvDetector detector = EnvDetector.getInstance();
         detector.detect();
-        detector.enableAutoRefresh(1, TimeUnit.MINUTES);
+
+        LOG.info("project {}", detector.getProjectId());
+        LOG.info("instance name {}", detector.getName());
+
+        if ( detector.runningInGCE() ) {
+            LOG.info("Running in GCE");
+
+            LOG.info("Zone {}", detector.getZone());
+            LOG.info("Private IP: {}", detector.getPrivateIP());
+        } else {
+            LOG.warn("Not running in GCE");
+        }
+
+        Group group = detector.getGroupOfInstance(new Instance("https://www.googleapis.com/compute/beta/projects/test-14378/zones/us-east1-b/instances/rtb-bidder-east-5l46"));
+
+        if ( group == null ) {
+            LOG.info("group not found");
+        } else {
+            LOG.info("group {}", group.getName());
+        }
     }
 }
