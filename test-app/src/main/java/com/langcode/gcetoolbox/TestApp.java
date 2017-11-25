@@ -27,13 +27,5 @@ public class TestApp {
         } else {
             LOG.warn("Not running in GCE");
         }
-
-        Group group = detector.getGroupOfInstance(new Instance("https://www.googleapis.com/compute/beta/projects/test-14378/zones/us-east1-b/instances/rtb-bidder-east-5l46"));
-
-        if ( group == null ) {
-            LOG.info("group not found");
-        } else {
-            LOG.info("group {}", group.getName());
-        }
     }
 }

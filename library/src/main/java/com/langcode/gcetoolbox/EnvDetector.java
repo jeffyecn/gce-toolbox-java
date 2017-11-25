@@ -19,11 +19,10 @@ import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.UnknownHostException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Timer;
-import java.util.TimerTask;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.function.IntConsumer;
 
 public class EnvDetector {
 
@@ -43,6 +42,11 @@ public class EnvDetector {
     private String zone = "";
     private String privateIP = "";
     private Instance vmInstance = null;
+    private InstanceDetail vmDetail = null;
+    private Group group = null;
+    private volatile ArrayList<Instance> peers = null;
+
+    private final ConcurrentHashMap<String, IntConsumer> numPeerListeners = new ConcurrentHashMap<>();
 
     Compute compute = null;
 
@@ -68,6 +72,20 @@ public class EnvDetector {
             }
 
             compute = initGceApi();
+
+            if ( inGCE ) {
+                vmDetail = getInstanceDetail(vmInstance);
+                group = getGroupOfInstance(vmInstance);
+            }
+        }
+
+        if ( group != null ) {
+            peers = getInstanceOfGroup(group);
+        } else {
+            if ( vmInstance != null ) {
+                peers = new ArrayList<>();
+                peers.add(vmInstance);
+            }
         }
     }
 
@@ -85,6 +103,11 @@ public class EnvDetector {
             return;
         }
 
+        if ( group == null ) {
+            LOG.warn("not in instance group, can not enable auto refresh");
+            return;
+        }
+
         if ( timer != null ) {
             LOG.warn("auto refresh already enabled");
             return;
@@ -97,7 +120,14 @@ public class EnvDetector {
             @Override
             public void run() {
                 try {
+                    int prevNum = getNumberOfPeers();
                     detect();
+                    int newNum = getNumberOfPeers();
+                    if ( newNum != prevNum ) {
+                        numPeerListeners.forEach((k,v)->{
+                            v.accept(newNum);
+                        });
+                    }
                 } catch (Exception ex) {
                     LOG.error("Refresh env failed.");
                 }
@@ -182,6 +212,32 @@ public class EnvDetector {
 
     public String getPrivateIP() {
         return privateIP;
+    }
+
+    public String getPublicIP() {
+        return vmDetail == null ? "" : vmDetail.publicIP;
+    }
+
+    public String getUsedByGroup() {
+        return group == null ? "" : group.name;
+    }
+
+    public int getNumberOfPeers() {
+        return peers == null ? 1 : peers.size();
+    }
+
+    public String onNumberOfPeersChanged(IntConsumer callback) {
+        String uuid = UUID.randomUUID().toString();
+        numPeerListeners.put(uuid, callback);
+        int num = getNumberOfPeers();
+        if ( num > 1 ) {
+            callback.accept(num);
+        }
+        return uuid;
+    }
+
+    public void removeNumberOfPeersChangeListener(String listenerId) {
+        numPeerListeners.remove(listenerId);
     }
 
     private Compute initGceApi() {
