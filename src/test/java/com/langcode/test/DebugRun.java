@@ -1,16 +1,21 @@
-package com.langcode.gcetoolbox;
+package com.langcode.test;
 
-import org.slf4j.Logger;
+import com.langcode.gcetoolbox.EnvDetector;
+import org.junit.Before;
+import org.junit.Test;
 import org.slf4j.LoggerFactory;
 
-public class TestApp {
-    private final static Logger LOG;
+public class DebugRun {
 
-    static {
-        LOG = LoggerFactory.getLogger(TestApp.class);
+    private org.slf4j.Logger LOG;
+
+    @Before
+    public void before() {
+        LOG = LoggerFactory.getLogger("DebugRun");
     }
 
-    public static void main(String[] args) throws Exception {
+    @Test
+    public void testOne() {
         LOG.info("testing");
 
         EnvDetector detector = EnvDetector.getInstance();
