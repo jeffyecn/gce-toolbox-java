@@ -14,6 +14,19 @@
     </scm>
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <!-- plugin version -->
+        <plugin.buildnumber.version>1.4</plugin.buildnumber.version>
+        <plugin.compiler.version>3.7.0</plugin.compiler.version>
+        <plugin.gpg.version>1.5</plugin.gpg.version>
+        <plugin.jar.version>3.0.2</plugin.jar.version>
+        <plugin.javadoc.version>2.9.1</plugin.javadoc.version>
+        <plugin.nexus-staging.version>1.6.8</plugin.nexus-staging.version>
+        <plugin.source.version>2.2.1</plugin.source.version>
+        <!-- dependency version -->
+        <google-api-service.version>beta-rev76-1.23.0</google-api-service.version>
+        <google-cloud.version>1.12.0</google-cloud.version>
+        <guava.version>23.6-jre</guava.version>
+        <slf4j.version>1.7.25</slf4j.version>
     </properties>
     <repositories>
         <repository>
@@ -28,22 +41,22 @@
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
-            <version>1.7.21</version>
+            <version>${slf4j.version}</version>
         </dependency>
         <dependency>
             <groupId>com.google.guava</groupId>
             <artifactId>guava</artifactId>
-            <version>23.4-jre</version>
+            <version>${guava.version}</version>
         </dependency>
         <dependency>
             <groupId>com.google.cloud</groupId>
             <artifactId>google-cloud-core</artifactId>
-            <version>1.12.0</version>
+            <version>${google-cloud.version}</version>
         </dependency>
         <dependency>
             <groupId>com.google.apis</groupId>
             <artifactId>google-api-services-compute</artifactId>
-            <version>beta-rev71-1.23.0</version>
+            <version>${google-api-service.version}</version>
             <exclusions>
                 <exclusion>
                     <groupId>com.google.guava</groupId>
@@ -51,12 +64,25 @@
                 </exclusion>
             </exclusions>
         </dependency>
+
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <version>4.12</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-simple</artifactId>
+            <version>${slf4j.version}</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
     <build>
         <plugins>
             <plugin>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.6.0</version>
+                <version>${plugin.compiler.version}</version>
                 <configuration>
                     <source>1.8</source>
                     <target>1.8</target>
@@ -64,7 +90,7 @@
             </plugin>
             <plugin>
                 <artifactId>maven-jar-plugin</artifactId>
-                <version>3.0.2</version>
+                <version>${plugin.jar.version}</version>
                 <configuration>
                     <archive>
                         <manifest>
@@ -80,7 +106,7 @@
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>buildnumber-maven-plugin</artifactId>
-                <version>1.4</version>
+                <version>${plugin.buildnumber.version}</version>
                 <executions>
                     <execution>
                         <phase>validate</phase>
@@ -93,7 +119,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-source-plugin</artifactId>
-                <version>2.2.1</version>
+                <version>${plugin.source.version}</version>
                 <executions>
                     <execution>
                         <id>attach-sources</id>
@@ -106,7 +132,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-javadoc-plugin</artifactId>
-                <version>2.9.1</version>
+                <version>${plugin.javadoc.version}</version>
                 <executions>
                     <execution>
                         <id>attach-javadocs</id>
@@ -119,7 +145,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-gpg-plugin</artifactId>
-                <version>1.5</version>
+                <version>${plugin.gpg.version}</version>
                 <executions>
                     <execution>
                         <id>sign-artifacts</id>
@@ -133,10 +159,10 @@
             <plugin>
                 <groupId>org.sonatype.plugins</groupId>
                 <artifactId>nexus-staging-maven-plugin</artifactId>
-                <version>1.6.8</version>
+                <version>${plugin.nexus-staging.version}</version>
                 <extensions>true</extensions>
                 <configuration>
-                    <serverId>ossrh</serverId>
+                    <serverId>ossrh-langcode</serverId>
                     <nexusUrl>https://oss.sonatype.org/</nexusUrl>
                     <autoReleaseAfterClose>true</autoReleaseAfterClose>
                 </configuration>
