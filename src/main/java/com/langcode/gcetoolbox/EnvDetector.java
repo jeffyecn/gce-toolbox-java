@@ -9,8 +9,6 @@ import com.google.api.services.compute.ComputeScopes;
 import com.google.api.services.compute.model.*;
 import com.google.cloud.ServiceOptions;
 import com.google.common.base.Splitter;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -23,10 +21,11 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.function.IntConsumer;
+import java.util.logging.Logger;
 
 public class EnvDetector {
 
-    private final static Logger LOG = LoggerFactory.getLogger(EnvDetector.class);
+    private final static Logger LOG = Logger.getLogger(EnvDetector.class.getName());
 
     private final static EnvDetector instance = new EnvDetector();
 
@@ -99,23 +98,22 @@ public class EnvDetector {
         }
 
         if ( ! inGCE ) {
-            LOG.warn("not in GCE, can not enable auto refresh");
+            LOG.warning("not in GCE, can not enable auto refresh");
             return;
         }
 
         if ( group == null ) {
-            LOG.warn("not in instance group, can not enable auto refresh");
+            LOG.warning("not in instance group, can not enable auto refresh");
             return;
         }
 
         if ( timer != null ) {
-            LOG.warn("auto refresh already enabled");
+            LOG.warning("auto refresh already enabled");
             return;
         }
 
         timer = new Timer("env refresh time", true);
         long period = timeUnit.toMillis(interval);
-        LOG.info("period {}", period);
         timer.scheduleAtFixedRate(new TimerTask() {
             @Override
             public void run() {
@@ -129,7 +127,7 @@ public class EnvDetector {
                         });
                     }
                 } catch (Exception ex) {
-                    LOG.error("Refresh env failed.");
+                    LOG.severe("Refresh env failed.");
                 }
             }
         }, period, period);
@@ -151,9 +149,9 @@ public class EnvDetector {
                 hostname = line.trim();
             }
         } catch (IOException ex) {
-            LOG.error("fail to run hostname command", ex);
+            LOG.severe("fail to run hostname command");
         } catch (InterruptedException ex) {
-            LOG.error("detect hostname aborted");
+            LOG.severe("detect hostname aborted");
         }
         return hostname;
     }
@@ -177,14 +175,14 @@ public class EnvDetector {
                 }
                 return result;
             } else {
-                LOG.error("fetch meta response code {}", code);
+                LOG.severe("fetch meta response code " + code);
             }
         } catch (MalformedURLException ex) {
-            LOG.error("invalid meta path {}", metaPath);
+            LOG.severe("invalid meta path " + metaPath);
         } catch (UnknownHostException ex) {
-            LOG.warn("metadata.google.internal unknown, not in GCE");
+            LOG.warning("metadata.google.internal unknown, not in GCE");
         } catch (IOException ex) {
-            LOG.error("other exception on get meta {}", ex.getClass().getCanonicalName());
+            LOG.severe("other exception on get meta " + ex.getClass().getCanonicalName());
         }
 
         return null;
@@ -256,7 +254,7 @@ public class EnvDetector {
                     .setApplicationName("gcetoolbox/1.0")
                     .build();
         } catch (Exception ex) {
-            LOG.error("init GCE api failed", ex);
+            LOG.severe("init GCE api failed " + ex.getMessage());
         }
 
         return null;
@@ -291,7 +289,7 @@ public class EnvDetector {
             } while (response.getNextPageToken() != null);
 
         } catch (IOException ex) {
-            LOG.warn("get instance of group failed");
+            LOG.severe("get instance of group failed");
         }
 
         return result;
@@ -303,7 +301,7 @@ public class EnvDetector {
             com.google.api.services.compute.model.Instance instanceData = req.execute();
             return new InstanceDetail(instanceData);
         } catch (IOException ex) {
-            LOG.warn("failed to get instance detail");
+            LOG.warning("failed to get instance detail");
         }
         return null;
     }
@@ -335,7 +333,7 @@ public class EnvDetector {
                 }
             }
         } catch (Exception ex) {
-            LOG.warn("fet group of instance failed");
+            LOG.warning("fet group of instance failed");
         }
 
         return null;

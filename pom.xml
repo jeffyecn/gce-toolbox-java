@@ -5,7 +5,7 @@
     <artifactId>gce-toolbox</artifactId>
     <name>GCE Toolbox</name>
     <description>Convenient toolbox for Google compute engine</description>
-    <version>1.0.1</version>
+    <version>1.0.2</version>
     <packaging>jar</packaging>
     <scm>
         <url>https://github.com/jeffyecn/gce-toolbox-java</url>
@@ -23,10 +23,10 @@
         <plugin.nexus-staging.version>1.6.8</plugin.nexus-staging.version>
         <plugin.source.version>2.2.1</plugin.source.version>
         <!-- dependency version -->
-        <google-api-service.version>beta-rev76-1.23.0</google-api-service.version>
-        <google-cloud.version>1.12.0</google-cloud.version>
-        <guava.version>23.6-jre</guava.version>
-        <slf4j.version>1.7.25</slf4j.version>
+        <google-cloud.version>1.17.0</google-cloud.version>
+        <google-api-client.version>1.23.0</google-api-client.version>
+        <google-api-compute.rev>rev79</google-api-compute.rev>
+        <guava.version>24.0-jre</guava.version>
     </properties>
     <repositories>
         <repository>
@@ -38,11 +38,6 @@
         </repository>
     </repositories>
     <dependencies>
-        <dependency>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-api</artifactId>
-            <version>${slf4j.version}</version>
-        </dependency>
         <dependency>
             <groupId>com.google.guava</groupId>
             <artifactId>guava</artifactId>
@@ -56,7 +51,7 @@
         <dependency>
             <groupId>com.google.apis</groupId>
             <artifactId>google-api-services-compute</artifactId>
-            <version>${google-api-service.version}</version>
+            <version>beta-${google-api-compute.rev}-${google-api-client.version}</version>
             <exclusions>
                 <exclusion>
                     <groupId>com.google.guava</groupId>
@@ -69,12 +64,6 @@
             <groupId>junit</groupId>
             <artifactId>junit</artifactId>
             <version>4.12</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-simple</artifactId>
-            <version>${slf4j.version}</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
