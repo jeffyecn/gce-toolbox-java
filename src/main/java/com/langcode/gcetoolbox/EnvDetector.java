@@ -306,6 +306,8 @@ public class EnvDetector {
         return null;
     }
 
+
+
     public Group getGroupOfInstance(Instance instance) {
         try {
             Compute.InstanceGroups.List req = compute.instanceGroups().list(instance.project, instance.zone);
@@ -339,7 +341,32 @@ public class EnvDetector {
         return null;
     }
 
-    public Map<String, Group> getAllGroupsOfZone(String zone) {
+    public List<Zone> getAllZones() {
+        ArrayList<Zone> result = new ArrayList<>();
+
+        try {
+            Compute.Zones.List req = compute.zones().list(projectId);
+            ZoneList response;
+            do {
+                response = req.execute();
+                if ( response.getItems() == null ) {
+                    continue;
+                }
+
+                for(com.google.api.services.compute.model.Zone zone : response.getItems()) {
+                    result.add(new Zone(zone.getName(), zone.getRegion()));
+                }
+
+                req.setPageToken(response.getNextPageToken());
+            } while(response.getNextPageToken() != null);
+        } catch (Exception ex) {
+            LOG.warning("get all zones failed");
+        }
+
+        return result;
+    }
+
+    public Map<String, Group> getGroupsOfZone(String zone) {
         HashMap<String, Group> result = new HashMap<>();
 
         try {
@@ -361,6 +388,16 @@ public class EnvDetector {
 
         } catch (Exception ex) {
             LOG.warning("get all group failed");
+        }
+
+        return result;
+    }
+
+    public Map<String, Group> getAllGroups() {
+        HashMap<String, Group> result = new HashMap<>();
+
+        for(Zone zone : getAllZones()) {
+            getGroupsOfZone(zone.getName()).forEach((name, group)->result.put(name, group));
         }
 
         return result;

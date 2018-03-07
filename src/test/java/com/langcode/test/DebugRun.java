@@ -2,8 +2,10 @@ package com.langcode.test;
 
 import com.langcode.gcetoolbox.EnvDetector;
 import com.langcode.gcetoolbox.Group;
+import com.langcode.gcetoolbox.Zone;
 import org.junit.Test;
 
+import java.util.List;
 import java.util.Map;
 
 public class DebugRun {
@@ -26,10 +28,16 @@ public class DebugRun {
             System.out.println("Not running in GCE");
         }
 
-        Map<String, Group> groups = detector.getAllGroupsOfZone("us-east1-b");
+        List<Zone> zones = detector.getAllZones();
 
-        groups.forEach((k,v)->{
-            System.out.println("Group "+k);
-        });
+        for(Zone zone : zones ) {
+            System.out.println("zone " + zone.getName() + " region " + zone.getRegion());
+
+            Map<String, Group> groups = detector.getGroupsOfZone(zone.getName());
+
+            groups.forEach((k,v)->{
+                System.out.println("Group "+k);
+            });
+        }
     }
 }
