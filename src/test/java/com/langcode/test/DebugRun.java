@@ -1,7 +1,10 @@
 package com.langcode.test;
 
 import com.langcode.gcetoolbox.EnvDetector;
+import com.langcode.gcetoolbox.Group;
 import org.junit.Test;
+
+import java.util.Map;
 
 public class DebugRun {
 
@@ -22,5 +25,11 @@ public class DebugRun {
         } else {
             System.out.println("Not running in GCE");
         }
+
+        Map<String, Group> groups = detector.getAllGroupsOfZone("us-east1-b");
+
+        groups.forEach((k,v)->{
+            System.out.println("Group "+k);
+        });
     }
 }

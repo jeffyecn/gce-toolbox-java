@@ -338,4 +338,31 @@ public class EnvDetector {
 
         return null;
     }
+
+    public Map<String, Group> getAllGroupsOfZone(String zone) {
+        HashMap<String, Group> result = new HashMap<>();
+
+        try {
+            Compute.InstanceGroups.List req = compute.instanceGroups().list(projectId, zone);
+            InstanceGroupList response;
+            do {
+                response = req.execute();
+                if ( response.getItems() == null ) {
+                    continue;
+                }
+
+                for(InstanceGroup group : response.getItems()) {
+                    Group groupObj = new Group(projectId, group.getZone(), group.getName());
+                    result.put(groupObj.getName(), groupObj);
+                }
+
+                req.setPageToken(response.getNextPageToken());
+            } while(response.getNextPageToken() != null);
+
+        } catch (Exception ex) {
+            LOG.warning("get all group failed");
+        }
+
+        return result;
+    }
 }
