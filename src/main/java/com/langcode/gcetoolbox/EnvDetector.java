@@ -282,6 +282,7 @@ public class EnvDetector {
 
                 for (InstanceWithNamedPorts instance : response.getItems()) {
                     String vmURL = instance.getInstance();
+                    System.out.println(vmURL);
                     result.add(new Instance(vmURL));
                 }
 
@@ -379,7 +380,7 @@ public class EnvDetector {
                 }
 
                 for(InstanceGroup group : response.getItems()) {
-                    Group groupObj = new Group(projectId, group.getZone(), group.getName());
+                    Group groupObj = new Group(projectId, zone, group.getName());
                     result.put(groupObj.getName(), groupObj);
                 }
 
@@ -401,5 +402,40 @@ public class EnvDetector {
         }
 
         return result;
+    }
+
+    public int getSizeOfGroup(Group group) {
+        try {
+            InstanceGroup groupInfo = compute.instanceGroups().get(group.project, group.zone, group.name).execute();
+            return groupInfo.getSize();
+        } catch (Exception ex) {
+            LOG.warning("get group info failed");
+        }
+
+        return 0;
+    }
+
+    public boolean resizeGroup(Group group, int newSize) {
+        try {
+            compute.instanceGroupManagers().resize(group.project, group.zone, group.name, newSize).execute();
+            return true;
+        } catch (Exception ex) {
+            LOG.warning("resize group failed");
+        }
+        return false;
+    }
+
+    public boolean removeInstanceFromGroup(String instanceName, Group group) {
+        ArrayList<String> deleting = new ArrayList<>();
+        deleting.add(Instance.makeVmURL(group.project, group.zone, instanceName));
+        InstanceGroupManagersDeleteInstancesRequest request = new InstanceGroupManagersDeleteInstancesRequest();
+        request.setInstances(deleting);
+        try {
+            compute.instanceGroupManagers().deleteInstances(group.project, group.zone, group.name, request).execute();
+            return true;
+        } catch(Exception ex) {
+            LOG.warning("remove instance from group failed");
+        }
+        return false;
     }
 }

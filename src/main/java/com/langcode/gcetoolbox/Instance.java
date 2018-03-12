@@ -6,6 +6,10 @@ import java.util.List;
 
 public class Instance {
 
+    public static String makeVmURL(String project, String zone, String name) {
+        return "https://www.googleapis.com/compute/beta/projects/" + project + "/zones/" + zone + "/instances/" + name;
+    }
+
     final String project;
     final String zone;
     final String name;
@@ -47,5 +51,9 @@ public class Instance {
 
     public String getName() {
         return name;
+    }
+
+    public String getVmURL() {
+        return makeVmURL(project, zone, name);
     }
 }
