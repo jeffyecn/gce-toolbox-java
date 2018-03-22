@@ -438,4 +438,26 @@ public class EnvDetector {
         }
         return false;
     }
+
+    public boolean stopSelf() {
+        if ( vmInstance == null ) {
+            LOG.warning("Stop self is not possible while not running in GCE");
+            return false;
+        }
+        return stopInstance(vmInstance);
+    }
+
+    public boolean stopInstance(Instance instance) {
+
+        try {
+            Compute.Instances.Stop request = compute.instances().stop(instance.project, instance.zone, instance.name);
+            request.execute();
+
+            return true;
+        } catch (IOException ex) {
+            LOG.severe("Stop instance failed with error " + ex.getMessage());
+        }
+
+        return false;
+    }
 }
