@@ -196,6 +196,10 @@ public class EnvDetector {
         return lines.get(0);
     }
 
+    public String fetchMetaAttribute(String attrName, String defaultValue) {
+        return fetchMeta("instance/attributes/" + attrName, defaultValue);
+    }
+
     public String getProjectId() {
         return projectId;
     }
