@@ -10,6 +10,7 @@ import com.google.api.services.compute.model.*;
 import com.google.cloud.ServiceOptions;
 import com.google.common.base.Splitter;
 
+import javax.annotation.Nullable;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -476,6 +477,28 @@ public class EnvDetector {
             return true;
         } catch (IOException ex) {
             LOG.severe("Start instance failed with error " + ex.getMessage());
+        }
+
+        return false;
+    }
+
+    public boolean createInstance(Instance instance, String template, @Nullable Map<String, String> meta) {
+        try {
+            com.google.api.services.compute.model.Instance info = new com.google.api.services.compute.model.Instance();
+            info.setName(instance.name);
+            info.setMachineType("zones/us-east1-b/machineTypes/n1-standard-1");
+            info.set("sourceInstanceTemplate", "global/instancesTemplates/" + template);
+            if ( meta != null ) {
+                Metadata metadata = new Metadata();
+                meta.forEach((k,v)->metadata.set(k,v));
+                info.setMetadata(metadata);
+            }
+            Compute.Instances.Insert request = compute.instances().insert(instance.project, instance.zone, info);
+            request.execute();
+
+            return true;
+        } catch (IOException ex) {
+            LOG.severe("Create instance failed with error " + ex.getMessage());
         }
 
         return false;

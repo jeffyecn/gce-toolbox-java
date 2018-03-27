@@ -6,6 +6,7 @@ import com.langcode.gcetoolbox.Instance;
 import com.langcode.gcetoolbox.Zone;
 import org.junit.Test;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -29,6 +30,9 @@ public class DebugRun {
             System.out.println("Not running in GCE");
         }
 
-
+        Instance instance = new Instance(detector.getProjectId(), "us-east1-b", "ipscore-dump");
+        HashMap<String, String> meta = new HashMap<>();
+        meta.put("skip", "yes");
+        detector.createInstance(instance, "ipscore-dump", meta);
     }
 }
