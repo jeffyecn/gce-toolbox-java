@@ -60,6 +60,10 @@ public class InstanceDetail {
         return status.equals("RUNNING");
     }
 
+    public boolean isStopped() {
+        return status.equals("TERMINATED");
+    }
+
     public String getStatus() {
         return status;
     }
