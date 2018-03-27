@@ -304,7 +304,9 @@ public class EnvDetector {
         try {
             Compute.Instances.Get req = compute.instances().get(instance.project, instance.zone, instance.name);
             com.google.api.services.compute.model.Instance instanceData = req.execute();
-            return new InstanceDetail(instanceData);
+            if ( instanceData != null ) {
+                return new InstanceDetail(instanceData);
+            }
         } catch (IOException ex) {
             LOG.warning("failed to get instance detail");
         }
