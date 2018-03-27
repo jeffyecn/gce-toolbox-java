@@ -60,6 +60,10 @@ public class InstanceDetail {
         return status.equals("RUNNING");
     }
 
+    public String getStatus() {
+        return status;
+    }
+
     public long getCreateTimestamp() {
         return createTime;
     }
