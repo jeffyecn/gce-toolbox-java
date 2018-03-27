@@ -466,4 +466,18 @@ public class EnvDetector {
 
         return false;
     }
+
+    public boolean startInstance(Instance instance) {
+
+        try {
+            Compute.Instances.Start request = compute.instances().start(instance.project, instance.zone, instance.name);
+            request.execute();
+
+            return true;
+        } catch (IOException ex) {
+            LOG.severe("Start instance failed with error " + ex.getMessage());
+        }
+
+        return false;
+    }
 }
