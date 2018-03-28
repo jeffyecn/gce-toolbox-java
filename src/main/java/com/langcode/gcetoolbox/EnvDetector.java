@@ -482,25 +482,70 @@ public class EnvDetector {
         return false;
     }
 
-    public boolean createInstance(Instance instance, String template, @Nullable Map<String, String> meta) {
+    InstanceTemplate getInstanceTemplate(String project, String template) {
         try {
-            com.google.api.services.compute.model.Instance info = new com.google.api.services.compute.model.Instance();
-            info.setName(instance.name);
-            info.setMachineType("zones/us-east1-b/machineTypes/n1-standard-1");
-            info.set("sourceInstanceTemplate", "global/instancesTemplates/" + template);
-            if ( meta != null ) {
-                Metadata metadata = new Metadata();
-                meta.forEach((k,v)->metadata.set(k,v));
-                info.setMetadata(metadata);
-            }
-            Compute.Instances.Insert request = compute.instances().insert(instance.project, instance.zone, info);
-            request.execute();
-
-            return true;
+            Compute.InstanceTemplates.Get req = compute.instanceTemplates().get(project, template);
+            return req.execute();
         } catch (IOException ex) {
-            LOG.severe("Create instance failed with error " + ex.getMessage());
+            LOG.severe("Failed to get template " + ex.getMessage());
         }
 
+        return null;
+    }
+
+    public boolean createInstance(Instance instance, String template, @Nullable Map<String, String> extraMeta) {
+        InstanceTemplate instanceTemplate = getInstanceTemplate(instance.project, template);
+        if ( instanceTemplate == null ) {
+            LOG.warning("Can not create instance because template not found");
+            return false;
+        }
+
+        InstanceProperties conf = instanceTemplate.getProperties();
+
+        com.google.api.services.compute.model.Instance data = new com.google.api.services.compute.model.Instance();
+        data.setName(instance.name);
+        if ( conf.getDescription() != null ) {
+            data.setDescription(conf.getDescription());
+        }
+
+        data.setMachineType("zones/" + instance.zone + "/machineTypes/" + conf.getMachineType());
+        data.setNetworkInterfaces(conf.getNetworkInterfaces());
+
+        List<AttachedDisk> disks = conf.getDisks();
+        disks.forEach(disk->{
+            String diskType = disk.getInitializeParams().getDiskType();
+            if ( diskType != null ) {
+                disk.getInitializeParams().setDiskType("zones/" + instance.zone + "/diskTypes/" + diskType);
+            }
+        });
+        data.setDisks(conf.getDisks());
+
+        data.setServiceAccounts(conf.getServiceAccounts());
+        data.setTags(conf.getTags());
+        data.setLabels(conf.getLabels());
+        data.setCanIpForward(conf.getCanIpForward());
+        data.setScheduling(conf.getScheduling());
+
+        Metadata meta = conf.getMetadata();
+        if ( extraMeta != null ) {
+            List<Metadata.Items> items = meta.getItems();
+            extraMeta.forEach((k,v)->{
+                Metadata.Items item = new Metadata.Items();
+                item.setKey(k);
+                item.setValue(v);
+                items.add(item);
+            });
+            meta.setItems(items);
+        }
+        data.setMetadata(meta);
+
+        try {
+            Compute.Instances.Insert insert = compute.instances().insert(instance.project, instance.zone, data);
+            insert.execute();
+            return true;
+        } catch ( IOException ex ) {
+            LOG.severe("Can not create instance from template: " + ex.getMessage());
+        }
         return false;
     }
 }

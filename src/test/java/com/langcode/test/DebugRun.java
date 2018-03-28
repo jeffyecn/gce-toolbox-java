@@ -29,10 +29,5 @@ public class DebugRun {
         } else {
             System.out.println("Not running in GCE");
         }
-
-        Instance instance = new Instance(detector.getProjectId(), "us-east1-b", "ipscore-dump");
-        HashMap<String, String> meta = new HashMap<>();
-        meta.put("skip", "yes");
-        detector.createInstance(instance, "ipscore-dump", meta);
     }
 }
