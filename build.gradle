@@ -1,0 +1,86 @@
+apply plugin: "java"
+
+ext.libraries = [
+        "google-api-client": "1.23.0",
+        "google-cloud": "1.17.0",
+	"google-api-compute": "rev79"
+        guava: "24.1-jre",
+	junit: "4.12"
+]
+
+group 'com.langcode'
+version '1.0.7'
+
+sourceCompatibility=1.8
+targetCompatibility=1.8
+
+repositories {
+    jcenter()
+}
+
+test {
+    testLogging {
+        showStandardStreams = true
+    }
+    useJUnit {
+        includeCategories 'debug.UnitTest'
+    }
+}
+
+task debug(type: Test) {
+    testLogging {
+        showStandardStreams = true
+    }
+    useJUnit {
+        excludeCategories 'debug.UnitTest'
+    }
+}
+
+dependencies {
+    testCompile "junit:junit:${libraries.junit}"
+    compile "com.google.guava:guava:${libraries.guava}"
+    compile "com.google.cloud:google-cloud-core:${libraries.'google-cloud'}"
+    compile (group: "com.google.apis", name: "google-api-services-compute", version: "${libraries.'google-api-compute'}-${libraries.'google-api-client'}") {
+        exclude group: 'com.google.guava'
+    }
+}
+
+task zipDist(type: Exec) {
+    workingDir "${buildDir}/distributions/"
+    commandLine "gzip", "-f", "-k", "${project.name}-${project.version}.tar"
+}
+
+task uploadAppToCloudStorage(type: UploadCloudStorageTask) {
+    bucket = "yesup-applications"
+    source = "${buildDir}/distributions/${project.name}-${project.version}.tar.gz"
+    destination = "${project.name}/${project.name}-${project.version}.tar.gz"
+}
+
+task createVersionFile {
+    doLast {
+        file("${buildDir}/distributions/current").write("${project.name}-${project.version}.tar.gz")
+    }
+}
+
+task uploadCurrentVersionFile(type: UploadCloudStorageTask) {
+    bucket = "yesup-applications"
+    source = "${buildDir}/distributions/current"
+    destination = "${project.name}/current"
+}
+
+task release {
+    dependsOn 'assemble'
+    dependsOn 'zipDist'
+    dependsOn 'uploadAppToCloudStorage'
+    dependsOn 'createVersionFile'
+    dependsOn 'uploadCurrentVersionFile'
+    tasks.findByName('zipDist').mustRunAfter('assemble')
+    tasks.findByName('uploadAppToCloudStorage').mustRunAfter('zipDist')
+    tasks.findByName('createVersionFile').mustRunAfter('uploadAppToCloudStorage')
+    tasks.findByName('uploadCurrentVersionFile').mustRunAfter('createVersionFile')
+}
+
+task wrapper(type: Wrapper) {
+    gradleVersion = '4.8-rc-1'
+    distributionType = 'all'
+}
