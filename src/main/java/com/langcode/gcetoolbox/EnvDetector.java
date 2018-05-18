@@ -9,6 +9,8 @@ import com.google.api.services.compute.ComputeScopes;
 import com.google.api.services.compute.model.*;
 import com.google.cloud.ServiceOptions;
 import com.google.common.base.Splitter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 import java.io.BufferedReader;
@@ -22,11 +24,10 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.function.IntConsumer;
-import java.util.logging.Logger;
 
 public class EnvDetector {
 
-    private final static Logger LOG = Logger.getLogger(EnvDetector.class.getName());
+    private final static Logger LOG = LoggerFactory.getLogger(EnvDetector.class);
 
     private final static EnvDetector instance = new EnvDetector();
 
@@ -99,17 +100,17 @@ public class EnvDetector {
         }
 
         if ( ! inGCE ) {
-            LOG.warning("not in GCE, can not enable auto refresh");
+            LOG.warn("not in GCE, can not enable auto refresh");
             return;
         }
 
         if ( group == null ) {
-            LOG.warning("not in instance group, can not enable auto refresh");
+            LOG.warn("not in instance group, can not enable auto refresh");
             return;
         }
 
         if ( timer != null ) {
-            LOG.warning("auto refresh already enabled");
+            LOG.warn("auto refresh already enabled");
             return;
         }
 
@@ -128,7 +129,7 @@ public class EnvDetector {
                         });
                     }
                 } catch (Exception ex) {
-                    LOG.severe("Refresh env failed.");
+                    LOG.error("Refresh env failed.");
                 }
             }
         }, period, period);
@@ -150,9 +151,9 @@ public class EnvDetector {
                 hostname = line.trim();
             }
         } catch (IOException ex) {
-            LOG.severe("fail to run hostname command");
+            LOG.error("fail to run hostname command");
         } catch (InterruptedException ex) {
-            LOG.severe("detect hostname aborted");
+            LOG.error("detect hostname aborted");
         }
         return hostname;
     }
@@ -176,14 +177,14 @@ public class EnvDetector {
                 }
                 return result;
             } else {
-                LOG.severe("fetch meta response code " + code);
+                LOG.error("fetch meta response code " + code);
             }
         } catch (MalformedURLException ex) {
-            LOG.severe("invalid meta path " + metaPath);
+            LOG.error("invalid meta path {}", metaPath);
         } catch (UnknownHostException ex) {
-            LOG.warning("metadata.google.internal unknown, not in GCE");
+            LOG.warn("metadata.google.internal unknown, not in GCE");
         } catch (IOException ex) {
-            LOG.severe("other exception on get meta " + ex.getClass().getCanonicalName());
+            LOG.error("other exception on get meta", ex);
         }
 
         return null;
@@ -259,7 +260,7 @@ public class EnvDetector {
                     .setApplicationName("gcetoolbox/1.0")
                     .build();
         } catch (Exception ex) {
-            LOG.severe("init GCE api failed " + ex.getMessage());
+            LOG.error("init GCE api failed {}", ex.getMessage());
         }
 
         return null;
@@ -295,7 +296,7 @@ public class EnvDetector {
             } while (response.getNextPageToken() != null);
 
         } catch (IOException ex) {
-            LOG.severe("get instance of group failed");
+            LOG.error("get instance of group failed");
         }
 
         return result;
@@ -309,7 +310,7 @@ public class EnvDetector {
                 return new InstanceDetail(instanceData);
             }
         } catch (IOException ex) {
-            LOG.warning("failed to get instance detail");
+            LOG.error("failed to get instance detail");
         }
         return null;
     }
@@ -343,7 +344,7 @@ public class EnvDetector {
                 }
             }
         } catch (Exception ex) {
-            LOG.warning("fet group of instance failed");
+            LOG.error("get group of instance failed");
         }
 
         return null;
@@ -368,7 +369,7 @@ public class EnvDetector {
                 req.setPageToken(response.getNextPageToken());
             } while(response.getNextPageToken() != null);
         } catch (Exception ex) {
-            LOG.warning("get all zones failed");
+            LOG.warn("get all zones failed");
         }
 
         return result;
@@ -395,7 +396,7 @@ public class EnvDetector {
             } while(response.getNextPageToken() != null);
 
         } catch (Exception ex) {
-            LOG.warning("get all group failed");
+            LOG.warn("get all group failed");
         }
 
         return result;
@@ -416,7 +417,7 @@ public class EnvDetector {
             InstanceGroup groupInfo = compute.instanceGroups().get(group.project, group.zone, group.name).execute();
             return groupInfo.getSize();
         } catch (Exception ex) {
-            LOG.warning("get group info failed");
+            LOG.warn("get group info failed");
         }
 
         return 0;
@@ -427,7 +428,7 @@ public class EnvDetector {
             compute.instanceGroupManagers().resize(group.project, group.zone, group.name, newSize).execute();
             return true;
         } catch (Exception ex) {
-            LOG.warning("resize group failed");
+            LOG.warn("resize group failed");
         }
         return false;
     }
@@ -441,14 +442,14 @@ public class EnvDetector {
             compute.instanceGroupManagers().deleteInstances(group.project, group.zone, group.name, request).execute();
             return true;
         } catch(Exception ex) {
-            LOG.warning("remove instance from group failed");
+            LOG.warn("remove instance from group failed");
         }
         return false;
     }
 
     public boolean stopSelf() {
         if ( vmInstance == null ) {
-            LOG.warning("Stop self is not possible while not running in GCE");
+            LOG.warn("Stop self is not possible while not running in GCE");
             return false;
         }
         return stopInstance(vmInstance);
@@ -462,7 +463,7 @@ public class EnvDetector {
 
             return true;
         } catch (IOException ex) {
-            LOG.severe("Stop instance failed with error " + ex.getMessage());
+            LOG.error("Stop instance failed with error ", ex);
         }
 
         return false;
@@ -476,7 +477,7 @@ public class EnvDetector {
 
             return true;
         } catch (IOException ex) {
-            LOG.severe("Start instance failed with error " + ex.getMessage());
+            LOG.error("Start instance failed with error ", ex);
         }
 
         return false;
@@ -487,7 +488,7 @@ public class EnvDetector {
             Compute.InstanceTemplates.Get req = compute.instanceTemplates().get(project, template);
             return req.execute();
         } catch (IOException ex) {
-            LOG.severe("Failed to get template " + ex.getMessage());
+            LOG.error("Failed to get template ", ex);
         }
 
         return null;
@@ -496,7 +497,7 @@ public class EnvDetector {
     public boolean createInstance(Instance instance, String template, @Nullable Map<String, String> extraMeta) {
         InstanceTemplate instanceTemplate = getInstanceTemplate(instance.project, template);
         if ( instanceTemplate == null ) {
-            LOG.warning("Can not create instance because template not found");
+            LOG.warn("Can not create instance because template not found");
             return false;
         }
 
@@ -544,7 +545,7 @@ public class EnvDetector {
             insert.execute();
             return true;
         } catch ( IOException ex ) {
-            LOG.severe("Can not create instance from template: " + ex.getMessage());
+            LOG.error("Can not create instance from template: {}", ex.getMessage());
         }
         return false;
     }

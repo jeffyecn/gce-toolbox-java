@@ -1,14 +1,7 @@
 package com.langcode.test;
 
 import com.langcode.gcetoolbox.EnvDetector;
-import com.langcode.gcetoolbox.Group;
-import com.langcode.gcetoolbox.Instance;
-import com.langcode.gcetoolbox.Zone;
 import org.junit.Test;
-
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 
 public class DebugRun {
 
