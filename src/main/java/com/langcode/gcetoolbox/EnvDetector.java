@@ -20,6 +20,7 @@ import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.UnknownHostException;
+import java.security.GeneralSecurityException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -59,20 +60,32 @@ public class EnvDetector {
         if (!hasDetect()) {
             // the following data won't change
             projectId = ServiceOptions.getDefaultProjectId();
-            name = fetchMeta("instance/name", "");
+            try {
+                name = fetchMeta("instance/name", "");
+            } catch (NotInGceError ex) {
+                LOG.warn("Not in google cloud");
+            }
             if (name.isEmpty()) {
                 inGCE = false;
                 name = getServerHostname();
             }
             if (inGCE) {
-                String fullZoneStr = fetchMeta("instance/zone", "");
-                List<String> parts = Splitter.on('/').splitToList(fullZoneStr);
-                zone = parts.get(parts.size() - 1);
-                privateIP = fetchMeta("instance/network-interfaces/0/ip", "");
-                vmInstance = new Instance(projectId, zone, name);
+                try {
+                    String fullZoneStr = fetchMeta("instance/zone", "");
+                    List<String> parts = Splitter.on('/').splitToList(fullZoneStr);
+                    zone = parts.get(parts.size() - 1);
+                    privateIP = fetchMeta("instance/network-interfaces/0/ip", "");
+                    vmInstance = new Instance(projectId, zone, name);
+                } catch (NotInGceError ex) {
+                    assert false;
+                }
             }
 
-            compute = initGceApi();
+            try {
+                compute = initGceApi();
+            } catch(GeneralSecurityException ex) {
+                throw new GceToolBoxError("Init Gce API failed with security error", ex);
+            }
 
             if (inGCE) {
                 vmDetail = getInstanceDetail(vmInstance);
@@ -160,7 +173,7 @@ public class EnvDetector {
         return hostname;
     }
 
-    public ArrayList<String> fetchMeta(String metaPath) throws IOException, GceToolBoxError {
+    public ArrayList<String> fetchMeta(String metaPath) throws IOException, GceToolBoxError, NotInGceError {
         try {
             URL url = new URL("http://metadata.google.internal/computeMetadata/v1/" + metaPath);
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
@@ -182,13 +195,13 @@ public class EnvDetector {
                 throw new GceToolBoxError("fetch meta response code " + code);
             }
         } catch (MalformedURLException ex) {
-            throw new GceToolBoxError("invalid meta path", ex);
+            throw new NotInGceError();
         } catch (UnknownHostException ex) {
-            throw new GceToolBoxError("Not in GCE", ex);
+            throw new NotInGceError();
         }
     }
 
-    public String fetchMeta(String metaPath, String defaultValue) throws IOException, GceToolBoxError {
+    public String fetchMeta(String metaPath, String defaultValue) throws IOException, GceToolBoxError, NotInGceError {
         ArrayList<String> lines = fetchMeta(metaPath);
         if (lines == null || lines.isEmpty()) {
             return defaultValue;
@@ -196,7 +209,7 @@ public class EnvDetector {
         return lines.get(0);
     }
 
-    public String fetchMetaAttribute(String attrName, String defaultValue) throws IOException, GceToolBoxError {
+    public String fetchMetaAttribute(String attrName, String defaultValue) throws IOException, GceToolBoxError, NotInGceError {
         return fetchMeta("instance/attributes/" + attrName, defaultValue);
     }
 
@@ -242,24 +255,20 @@ public class EnvDetector {
         numPeerListeners.remove(listenerId);
     }
 
-    private Compute initGceApi() throws GceToolBoxError {
-        try {
-            HttpTransport httpTransport = GoogleNetHttpTransport.newTrustedTransport();
+    private Compute initGceApi() throws GeneralSecurityException, IOException {
+        HttpTransport httpTransport = GoogleNetHttpTransport.newTrustedTransport();
 
-            GoogleCredential credential = GoogleCredential.getApplicationDefault();
+        GoogleCredential credential = GoogleCredential.getApplicationDefault();
 
-            if (credential.createScopedRequired()) {
-                ArrayList<String> scopes = new ArrayList<>();
-                scopes.add(ComputeScopes.COMPUTE_READONLY);
-                credential = credential.createScoped(scopes);
-            }
-
-            return new Compute.Builder(httpTransport, JacksonFactory.getDefaultInstance(), credential)
-                    .setApplicationName("gcetoolbox/1.0")
-                    .build();
-        } catch (Exception ex) {
-            throw new GceToolBoxError("init GCE api failed", ex);
+        if (credential.createScopedRequired()) {
+            ArrayList<String> scopes = new ArrayList<>();
+            scopes.add(ComputeScopes.COMPUTE_READONLY);
+            credential = credential.createScoped(scopes);
         }
+
+        return new Compute.Builder(httpTransport, JacksonFactory.getDefaultInstance(), credential)
+                .setApplicationName("gcetoolbox/1.0")
+                .build();
     }
 
     public ArrayList<Instance> getInstanceOfGroup(Group group) throws IOException {
@@ -406,9 +415,9 @@ public class EnvDetector {
 
     }
 
-    public void stopSelf() throws GceToolBoxError, IOException {
+    public void stopSelf() throws IOException, NotInGceError {
         if (vmInstance == null) {
-            throw new GceToolBoxError("Stop self is not possible while not running in GCE");
+            throw new NotInGceError();
         }
         stopInstance(vmInstance);
     }

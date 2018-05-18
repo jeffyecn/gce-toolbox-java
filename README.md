@@ -8,3 +8,7 @@ Java toolbox for common Google compute engine job
 
 This built jar file in build/libs/
 
+## Run debug test
+```
+./gradlew debug --tests com.langcode.test.DebugRun
+```
