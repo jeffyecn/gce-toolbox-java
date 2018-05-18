@@ -10,5 +10,5 @@ This built jar file in build/libs/
 
 ## Run debug test
 ```
-./gradlew debug --tests com.langcode.test.DebugRun
+./gradlew debug --tests debug.DebugRun
 ```

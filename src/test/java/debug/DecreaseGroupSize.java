@@ -1,4 +1,4 @@
-package com.langcode.test;
+package debug;
 
 import com.langcode.gcetoolbox.*;
 import org.junit.Test;
