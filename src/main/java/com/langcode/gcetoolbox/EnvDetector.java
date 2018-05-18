@@ -55,8 +55,8 @@ public class EnvDetector {
 
     }
 
-    public void detect() {
-        if ( ! hasDetect() ) {
+    public void detect() throws IOException, GceToolBoxError {
+        if (!hasDetect()) {
             // the following data won't change
             projectId = ServiceOptions.getDefaultProjectId();
             name = fetchMeta("instance/name", "");
@@ -67,23 +67,23 @@ public class EnvDetector {
             if (inGCE) {
                 String fullZoneStr = fetchMeta("instance/zone", "");
                 List<String> parts = Splitter.on('/').splitToList(fullZoneStr);
-                zone = parts.get(parts.size()-1);
+                zone = parts.get(parts.size() - 1);
                 privateIP = fetchMeta("instance/network-interfaces/0/ip", "");
                 vmInstance = new Instance(projectId, zone, name);
             }
 
             compute = initGceApi();
 
-            if ( inGCE ) {
+            if (inGCE) {
                 vmDetail = getInstanceDetail(vmInstance);
                 group = getGroupOfInstance(vmInstance);
             }
         }
 
-        if ( group != null ) {
+        if (group != null) {
             peers = getInstanceOfGroup(group);
         } else {
-            if ( vmInstance != null ) {
+            if (vmInstance != null) {
                 peers = new ArrayList<>();
                 peers.add(vmInstance);
             }
@@ -91,25 +91,25 @@ public class EnvDetector {
     }
 
     public boolean hasDetect() {
-        return ! projectId.isEmpty();
+        return !projectId.isEmpty();
     }
 
-    public void enableAutoRefresh(long interval, TimeUnit timeUnit) {
-        if ( ! hasDetect() ) {
+    public void enableAutoRefresh(long interval, TimeUnit timeUnit) throws IOException, GceToolBoxError {
+        if (!hasDetect()) {
             detect();
         }
 
-        if ( ! inGCE ) {
+        if (!inGCE) {
             LOG.warn("not in GCE, can not enable auto refresh");
             return;
         }
 
-        if ( group == null ) {
+        if (group == null) {
             LOG.warn("not in instance group, can not enable auto refresh");
             return;
         }
 
-        if ( timer != null ) {
+        if (timer != null) {
             LOG.warn("auto refresh already enabled");
             return;
         }
@@ -123,13 +123,17 @@ public class EnvDetector {
                     int prevNum = getNumberOfPeers();
                     detect();
                     int newNum = getNumberOfPeers();
-                    if ( newNum != prevNum ) {
-                        numPeerListeners.forEach((k,v)->{
-                            v.accept(newNum);
+                    if (newNum != prevNum) {
+                        numPeerListeners.forEach((k, v) -> {
+                            try {
+                                v.accept(newNum);
+                            } catch (Exception ex) {
+                                LOG.error("refresh listener got exception", ex);
+                            }
                         });
                     }
                 } catch (Exception ex) {
-                    LOG.error("Refresh env failed.");
+                    LOG.error("Refresh env failed.", ex);
                 }
             }
         }, period, period);
@@ -139,7 +143,7 @@ public class EnvDetector {
         return inGCE;
     }
 
-    String getServerHostname() {
+    String getServerHostname() throws IOException {
         String hostname = "";
         try {
             Process p = Runtime.getRuntime().exec("hostname -s");
@@ -147,58 +151,52 @@ public class EnvDetector {
             BufferedReader reader
                     = new BufferedReader(new InputStreamReader(p.getInputStream()));
             String line = reader.readLine();
-            if ( line != null ) {
+            if (line != null) {
                 hostname = line.trim();
             }
-        } catch (IOException ex) {
-            LOG.error("fail to run hostname command");
         } catch (InterruptedException ex) {
-            LOG.error("detect hostname aborted");
+            LOG.warn("detect hostname aborted");
         }
         return hostname;
     }
 
-    public ArrayList<String> fetchMeta(String metaPath) {
+    public ArrayList<String> fetchMeta(String metaPath) throws IOException, GceToolBoxError {
         try {
             URL url = new URL("http://metadata.google.internal/computeMetadata/v1/" + metaPath);
-            HttpURLConnection conn = (HttpURLConnection)url.openConnection();
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             conn.addRequestProperty("Metadata-Flavor", "Google");
             conn.setConnectTimeout(500);
             int code = conn.getResponseCode();
-            if ( code == 200 ) {
+            if (code == 200) {
                 ArrayList<String> result = new ArrayList<>();
                 BufferedReader reader
                         = new BufferedReader(new InputStreamReader(conn.getInputStream()));
                 String line;
-                while ( (line = reader.readLine()) != null ) {
-                    if ( ! line.trim().isEmpty() ) {
+                while ((line = reader.readLine()) != null) {
+                    if (!line.trim().isEmpty()) {
                         result.add(line);
                     }
                 }
                 return result;
             } else {
-                LOG.error("fetch meta response code " + code);
+                throw new GceToolBoxError("fetch meta response code " + code);
             }
         } catch (MalformedURLException ex) {
-            LOG.error("invalid meta path {}", metaPath);
+            throw new GceToolBoxError("invalid meta path", ex);
         } catch (UnknownHostException ex) {
-            LOG.warn("metadata.google.internal unknown, not in GCE");
-        } catch (IOException ex) {
-            LOG.error("other exception on get meta", ex);
+            throw new GceToolBoxError("Not in GCE", ex);
         }
-
-        return null;
     }
 
-    public String fetchMeta(String metaPath, String defaultValue) {
+    public String fetchMeta(String metaPath, String defaultValue) throws IOException, GceToolBoxError {
         ArrayList<String> lines = fetchMeta(metaPath);
-        if ( lines == null || lines.isEmpty() ) {
+        if (lines == null || lines.isEmpty()) {
             return defaultValue;
         }
         return lines.get(0);
     }
 
-    public String fetchMetaAttribute(String attrName, String defaultValue) {
+    public String fetchMetaAttribute(String attrName, String defaultValue) throws IOException, GceToolBoxError {
         return fetchMeta("instance/attributes/" + attrName, defaultValue);
     }
 
@@ -234,7 +232,7 @@ public class EnvDetector {
         String uuid = UUID.randomUUID().toString();
         numPeerListeners.put(uuid, callback);
         int num = getNumberOfPeers();
-        if ( num > 1 ) {
+        if (num > 1) {
             callback.accept(num);
         }
         return uuid;
@@ -244,7 +242,7 @@ public class EnvDetector {
         numPeerListeners.remove(listenerId);
     }
 
-    private Compute initGceApi() {
+    private Compute initGceApi() throws GceToolBoxError {
         try {
             HttpTransport httpTransport = GoogleNetHttpTransport.newTrustedTransport();
 
@@ -260,252 +258,188 @@ public class EnvDetector {
                     .setApplicationName("gcetoolbox/1.0")
                     .build();
         } catch (Exception ex) {
-            LOG.error("init GCE api failed {}", ex.getMessage());
+            throw new GceToolBoxError("init GCE api failed", ex);
         }
-
-        return null;
     }
 
-    public ArrayList<Instance> getInstanceOfGroup(Group group) {
+    public ArrayList<Instance> getInstanceOfGroup(Group group) throws IOException {
         ArrayList<Instance> result = new ArrayList<>();
 
-        try {
-            Compute.InstanceGroups.ListInstances request = compute.instanceGroups().listInstances(
-                    group.project,
-                    group.zone,
-                    group.name,
-                    new InstanceGroupsListInstancesRequest()
-            );
+        Compute.InstanceGroups.ListInstances request = compute.instanceGroups().listInstances(
+                group.project,
+                group.zone,
+                group.name,
+                new InstanceGroupsListInstancesRequest()
+        );
 
-            InstanceGroupsListInstances response;
+        InstanceGroupsListInstances response;
 
-            do {
-                response = request.execute();
+        do {
+            response = request.execute();
 
-                if (response.getItems() == null) {
-                    continue;
-                }
+            if (response.getItems() == null) {
+                continue;
+            }
 
-                for (InstanceWithNamedPorts instance : response.getItems()) {
-                    String vmURL = instance.getInstance();
-                    System.out.println(vmURL);
-                    result.add(new Instance(vmURL));
-                }
+            for (InstanceWithNamedPorts instance : response.getItems()) {
+                String vmURL = instance.getInstance();
+                System.out.println(vmURL);
+                result.add(new Instance(vmURL));
+            }
 
-                request.setPageToken(response.getNextPageToken());
-            } while (response.getNextPageToken() != null);
-
-        } catch (IOException ex) {
-            LOG.error("get instance of group failed");
-        }
+            request.setPageToken(response.getNextPageToken());
+        } while (response.getNextPageToken() != null);
 
         return result;
     }
 
-    public InstanceDetail getInstanceDetail(Instance instance) {
-        try {
-            Compute.Instances.Get req = compute.instances().get(instance.project, instance.zone, instance.name);
-            com.google.api.services.compute.model.Instance instanceData = req.execute();
-            if ( instanceData != null ) {
-                return new InstanceDetail(instanceData);
-            }
-        } catch (IOException ex) {
-            LOG.error("failed to get instance detail");
+    public InstanceDetail getInstanceDetail(Instance instance) throws IOException, GceToolBoxError {
+        Compute.Instances.Get req = compute.instances().get(instance.project, instance.zone, instance.name);
+        com.google.api.services.compute.model.Instance instanceData = req.execute();
+        if (instanceData != null) {
+            return new InstanceDetail(instanceData);
         }
-        return null;
+
+        throw new GceToolBoxError("Instance not exists");
     }
 
 
+    @Nullable
+    public Group getGroupOfInstance(Instance instance) throws IOException {
+        Compute.InstanceGroups.List req = compute.instanceGroups().list(instance.project, instance.zone);
 
-    public Group getGroupOfInstance(Instance instance) {
-        try {
-            Compute.InstanceGroups.List req = compute.instanceGroups().list(instance.project, instance.zone);
+        ArrayList<Group> groups = new ArrayList<>();
+        InstanceGroupList response;
+        do {
+            response = req.execute();
+            if (response.getItems() == null) {
+                continue;
+            }
 
-            ArrayList<Group> groups = new ArrayList<>();
-            InstanceGroupList response;
-            do {
-                response = req.execute();
-                if ( response.getItems() == null ) {
-                    continue;
-                }
+            for (InstanceGroup group : response.getItems()) {
+                groups.add(new Group(instance.project, instance.zone, group.getName()));
+            }
 
-                for(InstanceGroup group : response.getItems()) {
-                    groups.add(new Group(instance.project, instance.zone, group.getName()));
-                }
+            req.setPageToken(response.getNextPageToken());
+        } while (response.getNextPageToken() != null);
 
-                req.setPageToken(response.getNextPageToken());
-            } while(response.getNextPageToken() != null);
-
-            for(Group group : groups) {
-                for (Instance groupInstance : getInstanceOfGroup(group) ) {
-                    if ( groupInstance.equals(instance) ) {
-                        return group;
-                    }
+        for (Group group : groups) {
+            for (Instance groupInstance : getInstanceOfGroup(group)) {
+                if (groupInstance.equals(instance)) {
+                    return group;
                 }
             }
-        } catch (Exception ex) {
-            LOG.error("get group of instance failed");
         }
 
         return null;
     }
 
-    public List<Zone> getAllZones() {
+    public List<Zone> getAllZones() throws IOException {
         ArrayList<Zone> result = new ArrayList<>();
 
-        try {
-            Compute.Zones.List req = compute.zones().list(projectId);
-            ZoneList response;
-            do {
-                response = req.execute();
-                if ( response.getItems() == null ) {
-                    continue;
-                }
+        Compute.Zones.List req = compute.zones().list(projectId);
+        ZoneList response;
+        do {
+            response = req.execute();
+            if (response.getItems() == null) {
+                continue;
+            }
 
-                for(com.google.api.services.compute.model.Zone zone : response.getItems()) {
-                    result.add(new Zone(zone.getName(), zone.getRegion()));
-                }
+            for (com.google.api.services.compute.model.Zone zone : response.getItems()) {
+                result.add(new Zone(zone.getName(), zone.getRegion()));
+            }
 
-                req.setPageToken(response.getNextPageToken());
-            } while(response.getNextPageToken() != null);
-        } catch (Exception ex) {
-            LOG.warn("get all zones failed");
-        }
+            req.setPageToken(response.getNextPageToken());
+        } while (response.getNextPageToken() != null);
 
         return result;
     }
 
-    public Map<String, Group> getGroupsOfZone(String zone) {
+    public Map<String, Group> getGroupsOfZone(String zone) throws IOException {
         HashMap<String, Group> result = new HashMap<>();
 
-        try {
-            Compute.InstanceGroups.List req = compute.instanceGroups().list(projectId, zone);
-            InstanceGroupList response;
-            do {
-                response = req.execute();
-                if ( response.getItems() == null ) {
-                    continue;
-                }
+        Compute.InstanceGroups.List req = compute.instanceGroups().list(projectId, zone);
+        InstanceGroupList response;
+        do {
+            response = req.execute();
+            if (response.getItems() == null) {
+                continue;
+            }
 
-                for(InstanceGroup group : response.getItems()) {
-                    Group groupObj = new Group(projectId, zone, group.getName());
-                    result.put(groupObj.getName(), groupObj);
-                }
+            for (InstanceGroup group : response.getItems()) {
+                Group groupObj = new Group(projectId, zone, group.getName());
+                result.put(groupObj.getName(), groupObj);
+            }
 
-                req.setPageToken(response.getNextPageToken());
-            } while(response.getNextPageToken() != null);
+            req.setPageToken(response.getNextPageToken());
+        } while (response.getNextPageToken() != null);
 
-        } catch (Exception ex) {
-            LOG.warn("get all group failed");
-        }
 
         return result;
     }
 
-    public Map<String, Group> getAllGroups() {
+    public Map<String, Group> getAllGroups() throws IOException {
         HashMap<String, Group> result = new HashMap<>();
 
-        for(Zone zone : getAllZones()) {
-            getGroupsOfZone(zone.getName()).forEach((name, group)->result.put(name, group));
+        for (Zone zone : getAllZones()) {
+            getGroupsOfZone(zone.getName()).forEach((name, group) -> result.put(name, group));
         }
 
         return result;
     }
 
-    public int getSizeOfGroup(Group group) {
-        try {
-            InstanceGroup groupInfo = compute.instanceGroups().get(group.project, group.zone, group.name).execute();
-            return groupInfo.getSize();
-        } catch (Exception ex) {
-            LOG.warn("get group info failed");
-        }
-
-        return 0;
+    public int getSizeOfGroup(Group group) throws IOException {
+        InstanceGroup groupInfo = compute.instanceGroups().get(group.project, group.zone, group.name).execute();
+        return groupInfo.getSize();
     }
 
-    public boolean resizeGroup(Group group, int newSize) {
-        try {
-            compute.instanceGroupManagers().resize(group.project, group.zone, group.name, newSize).execute();
-            return true;
-        } catch (Exception ex) {
-            LOG.warn("resize group failed");
-        }
-        return false;
+    public void resizeGroup(Group group, int newSize) throws IOException {
+        compute.instanceGroupManagers().resize(group.project, group.zone, group.name, newSize).execute();
     }
 
-    public boolean removeInstanceFromGroup(String instanceName, Group group) {
+    public void removeInstanceFromGroup(String instanceName, Group group) throws IOException {
         ArrayList<String> deleting = new ArrayList<>();
         deleting.add(Instance.makeVmURL(group.project, group.zone, instanceName));
         InstanceGroupManagersDeleteInstancesRequest request = new InstanceGroupManagersDeleteInstancesRequest();
         request.setInstances(deleting);
-        try {
-            compute.instanceGroupManagers().deleteInstances(group.project, group.zone, group.name, request).execute();
-            return true;
-        } catch(Exception ex) {
-            LOG.warn("remove instance from group failed");
-        }
-        return false;
+        compute.instanceGroupManagers().deleteInstances(group.project, group.zone, group.name, request).execute();
+
     }
 
-    public boolean stopSelf() {
-        if ( vmInstance == null ) {
-            LOG.warn("Stop self is not possible while not running in GCE");
-            return false;
+    public void stopSelf() throws GceToolBoxError, IOException {
+        if (vmInstance == null) {
+            throw new GceToolBoxError("Stop self is not possible while not running in GCE");
         }
-        return stopInstance(vmInstance);
+        stopInstance(vmInstance);
     }
 
-    public boolean stopInstance(Instance instance) {
-
-        try {
-            Compute.Instances.Stop request = compute.instances().stop(instance.project, instance.zone, instance.name);
-            request.execute();
-
-            return true;
-        } catch (IOException ex) {
-            LOG.error("Stop instance failed with error ", ex);
-        }
-
-        return false;
+    public void stopInstance(Instance instance) throws IOException {
+        Compute.Instances.Stop request = compute.instances().stop(instance.project, instance.zone, instance.name);
+        request.execute();
     }
 
-    public boolean startInstance(Instance instance) {
-
-        try {
-            Compute.Instances.Start request = compute.instances().start(instance.project, instance.zone, instance.name);
-            request.execute();
-
-            return true;
-        } catch (IOException ex) {
-            LOG.error("Start instance failed with error ", ex);
-        }
-
-        return false;
+    public void startInstance(Instance instance) throws IOException {
+        Compute.Instances.Start request = compute.instances().start(instance.project, instance.zone, instance.name);
+        request.execute();
     }
 
-    InstanceTemplate getInstanceTemplate(String project, String template) {
-        try {
-            Compute.InstanceTemplates.Get req = compute.instanceTemplates().get(project, template);
-            return req.execute();
-        } catch (IOException ex) {
-            LOG.error("Failed to get template ", ex);
-        }
-
-        return null;
+    @Nullable
+    InstanceTemplate getInstanceTemplate(String project, String template) throws IOException {
+        Compute.InstanceTemplates.Get req = compute.instanceTemplates().get(project, template);
+        return req.execute();
     }
 
-    public boolean createInstance(Instance instance, String template, @Nullable Map<String, String> extraMeta) {
+    public void createInstance(Instance instance, String template, @Nullable Map<String, String> extraMeta) throws IOException, GceToolBoxError {
         InstanceTemplate instanceTemplate = getInstanceTemplate(instance.project, template);
-        if ( instanceTemplate == null ) {
-            LOG.warn("Can not create instance because template not found");
-            return false;
+        if (instanceTemplate == null) {
+            throw new GceToolBoxError("Can not create instance because template not found");
         }
 
         InstanceProperties conf = instanceTemplate.getProperties();
 
         com.google.api.services.compute.model.Instance data = new com.google.api.services.compute.model.Instance();
         data.setName(instance.name);
-        if ( conf.getDescription() != null ) {
+        if (conf.getDescription() != null) {
             data.setDescription(conf.getDescription());
         }
 
@@ -513,9 +447,9 @@ public class EnvDetector {
         data.setNetworkInterfaces(conf.getNetworkInterfaces());
 
         List<AttachedDisk> disks = conf.getDisks();
-        disks.forEach(disk->{
+        disks.forEach(disk -> {
             String diskType = disk.getInitializeParams().getDiskType();
-            if ( diskType != null ) {
+            if (diskType != null) {
                 disk.getInitializeParams().setDiskType("zones/" + instance.zone + "/diskTypes/" + diskType);
             }
         });
@@ -528,9 +462,9 @@ public class EnvDetector {
         data.setScheduling(conf.getScheduling());
 
         Metadata meta = conf.getMetadata();
-        if ( extraMeta != null ) {
+        if (extraMeta != null) {
             List<Metadata.Items> items = meta.getItems();
-            extraMeta.forEach((k,v)->{
+            extraMeta.forEach((k, v) -> {
                 Metadata.Items item = new Metadata.Items();
                 item.setKey(k);
                 item.setValue(v);
@@ -540,13 +474,7 @@ public class EnvDetector {
         }
         data.setMetadata(meta);
 
-        try {
-            Compute.Instances.Insert insert = compute.instances().insert(instance.project, instance.zone, data);
-            insert.execute();
-            return true;
-        } catch ( IOException ex ) {
-            LOG.error("Can not create instance from template: {}", ex.getMessage());
-        }
-        return false;
+        Compute.Instances.Insert insert = compute.instances().insert(instance.project, instance.zone, data);
+        insert.execute();
     }
 }

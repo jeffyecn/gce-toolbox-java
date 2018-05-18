@@ -1,19 +1,22 @@
 package com.langcode.test;
 
-import com.langcode.gcetoolbox.EnvDetector;
-import com.langcode.gcetoolbox.Group;
-import com.langcode.gcetoolbox.Instance;
-import com.langcode.gcetoolbox.InstanceDetail;
+import com.langcode.gcetoolbox.*;
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
 
 public class DecreaseGroupSize {
 
+    private final static Logger LOG = LoggerFactory.getLogger(DecreaseGroupSize.class);
+
     @Test
-    public void decreaseGroupSize() {
+    public void decreaseGroupSize() throws IOException, GceToolBoxError {
         String groupName = System.getProperty("group");
 
         if ( groupName == null || groupName.isEmpty() ) {
-            System.err.println("Missing group property");
+            LOG.error("Missing group property");
             return;
         }
 
@@ -22,7 +25,7 @@ public class DecreaseGroupSize {
 
         Group group = detector.getAllGroups().get(groupName);
         if ( group == null ) {
-            System.err.println("Group " + groupName + " can not be found");
+            LOG.error("Group {} can not be found", groupName);
             return;
         }
 
@@ -42,11 +45,11 @@ public class DecreaseGroupSize {
         }
 
         if ( removing == null ) {
-            System.err.println("No instance found from group");
+            LOG.error("No instance found from group");
             return;
         }
 
-        System.out.println("removing instance " + removing.getName());
+        LOG.info("removing instance {}", removing.getName());
 
         detector.removeInstanceFromGroup(removing.getName(), group);
     }

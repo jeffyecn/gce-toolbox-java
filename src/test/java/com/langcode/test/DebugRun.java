@@ -1,26 +1,32 @@
 package com.langcode.test;
 
 import com.langcode.gcetoolbox.EnvDetector;
+import com.langcode.gcetoolbox.GceToolBoxError;
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
 
 public class DebugRun {
 
+    private final static Logger LOG = LoggerFactory.getLogger(DebugRun.class);
+
     @Test
-    public void testOne() {
+    public void testOne() throws IOException, GceToolBoxError {
 
         EnvDetector detector = EnvDetector.getInstance();
         detector.detect();
 
-        System.out.println("project " + detector.getProjectId());
-        System.out.println("instance name " + detector.getName());
+        LOG.info("project {}", detector.getProjectId());
+        LOG.info("instance name {}", detector.getName());
 
         if ( detector.runningInGCE() ) {
-            System.out.println("Running in GCE");
-
-            System.out.println("Zone " + detector.getZone());
-            System.out.println("Private IP: " + detector.getPrivateIP());
+            LOG.info("Running in GCE");
+            LOG.info("Zone {}", detector.getZone());
+            LOG.info("Private IP: {}", detector.getPrivateIP());
         } else {
-            System.out.println("Not running in GCE");
+            LOG.warn("Not running in GCE");
         }
     }
 }
