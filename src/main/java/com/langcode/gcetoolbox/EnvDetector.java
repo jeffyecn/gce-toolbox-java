@@ -56,6 +56,11 @@ public class EnvDetector {
 
     }
 
+    String urlToZone(String fullZoneStr) {
+        List<String> parts = Splitter.on('/').splitToList(fullZoneStr);
+        return parts.get(parts.size() - 1);
+    }
+
     public void detect() throws IOException, GceToolBoxError {
         if (!hasDetect()) {
             // the following data won't change
@@ -71,9 +76,7 @@ public class EnvDetector {
             }
             if (inGCE) {
                 try {
-                    String fullZoneStr = fetchMeta("instance/zone", "");
-                    List<String> parts = Splitter.on('/').splitToList(fullZoneStr);
-                    zone = parts.get(parts.size() - 1);
+                    zone = urlToZone(fetchMeta("instance/zone", ""));
                     privateIP = fetchMeta("instance/network-interfaces/0/ip", "");
                     vmInstance = new Instance(projectId, zone, name);
                 } catch (NotInGceError ex) {
@@ -83,7 +86,7 @@ public class EnvDetector {
 
             try {
                 compute = initGceApi();
-            } catch(GeneralSecurityException ex) {
+            } catch (GeneralSecurityException ex) {
                 throw new GceToolBoxError("Init Gce API failed with security error", ex);
             }
 
@@ -390,9 +393,35 @@ public class EnvDetector {
     public Map<String, Group> getAllGroups() throws IOException {
         HashMap<String, Group> result = new HashMap<>();
 
-        for (Zone zone : getAllZones()) {
-            getGroupsOfZone(zone.getName()).forEach((name, group) -> result.put(name, group));
-        }
+        Compute.InstanceGroups.AggregatedList req = compute.instanceGroups().aggregatedList(projectId);
+        InstanceGroupAggregatedList response;
+        do {
+            response = req.execute();
+
+            Map<String, InstanceGroupsScopedList> items = response.getItems();
+
+            if (items == null) {
+                continue;
+            }
+
+            items.forEach((scopeName, scopedList) -> {
+                if (scopedList == null) {
+                    return;
+                }
+                List<InstanceGroup> groups = scopedList.getInstanceGroups();
+                if ( groups == null ) {
+                    return;
+                }
+                for (InstanceGroup group : groups) {
+                    LOG.debug("zone {}", group.getZone());
+                    Group groupObj = new Group(projectId, urlToZone(group.getZone()), group.getName());
+                    result.put(groupObj.getName(), groupObj);
+                }
+            });
+
+            req.setPageToken(response.getNextPageToken());
+        } while (response.getNextPageToken() != null);
+
 
         return result;
     }
